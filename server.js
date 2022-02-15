@@ -1,12 +1,7 @@
-var request      = require("request")
-  , express      = require("express")
+var express      = require("express")
   , morgan       = require("morgan")
-  , path         = require("path")
   , bodyParser   = require("body-parser")
-  , async        = require("async")
-  , cookieParser = require("cookie-parser")
   , session      = require("express-session")
-  , config       = require("./config")
   , helpers      = require("./helpers")
   , cart         = require("./api/cart")
   , catalogue    = require("./api/catalogue")
@@ -14,22 +9,47 @@ var request      = require("request")
   , user         = require("./api/user")
   , metrics      = require("./api/metrics")
   , app          = express()
+const cookieParser = require("cookie-parser");
+
+function makeTraceId(length) {
+    let result = '';
+    const characters = 'abcde0123456789';
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++ ) {
+        result += characters.charAt(Math.floor(Math.random() *
+            charactersLength));
+    }
+    return result;
+}
 
 
 app.use(helpers.rewriteSlash);
 app.use(metrics);
 app.use(express.static("public"));
-if(process.env.SESSION_REDIS) {
-    console.log('Using the redis based session manager');
-    app.use(session(config.session_redis));
+
+console.log('Using local session manager');
+
+const secret = makeTraceId(32)
+// session data will expire after 30 minutes
+app.use(session({
+        name: 'md.sid',
+    saveUninitialized: true,
+    resave: true,
+    secret: secret,
+    cookie: { maxAge: 1800000, sameSite: true },
 }
-else {
-    console.log('Using local session manager');
-    app.use(session(config.session));
-}
+))
+app.get('/*',function(req,res,next){
+    req.session.traceparent = (req.session.traceparent || '00-' + makeTraceId(32) + '-d21f7bc17caa5aba-01')
+    res.cookie('traceparent', req.session.traceparent)
+    res.cookie('sid',req.sessionID)
+    res.cookie('SameSite','Strict')
+    next(); // http://expressjs.com/guide.html#passing-route control
+});
+
 
 app.use(bodyParser.json());
-app.use(cookieParser());
+app.use(cookieParser(secret));
 app.use(helpers.sessionMiddleware);
 app.use(morgan("dev", {}));
 

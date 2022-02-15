@@ -1,0 +1,54 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: "localhost:4318"
+        cors:
+          allowed_origins:
+            - "http://localhost:*"
+      grpc:
+        endpoint: "localhost:4317"
+
+  otlp/spanmetrics:
+    protocols:
+      grpc:
+        endpoint: "localhost:12345"
+
+
+processors:
+  batch:
+  spanmetrics:
+    metrics_exporter: prometheusremotewrite
+    latency_histogram_buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms, 1s]
+    dimensions:
+      - name: http.status_code
+
+exporters:
+  logzio:
+    account_token: ""
+    region: "us"
+
+  otlp/spanmetrics:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+  prometheusremotewrite:
+    endpoint: https://listener.logz.io:8053
+    headers:
+      Authorization: "Bearer "
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch,spanmetrics]
+      exporters: [logzio]
+
+    metrics/spanmetrics:
+      receivers: [otlp/spanmetrics]
+      exporters: [prometheusremotewrite]
+
+  telemetry:
+    logs:
+      level: "debug"
