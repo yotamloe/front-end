@@ -2,7 +2,7 @@ version: '2'
 
 services:
   front-end:
-    image: yotamloe/sockshop-front-end:0.0.7
+    image: yotamloe/sockshop-front-end:0.0.8
     hostname: front-end
     ports:
     - 8079:8079
